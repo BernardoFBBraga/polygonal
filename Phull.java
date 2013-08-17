@@ -107,6 +107,7 @@ public class Phull {
 	}
 
 	// ## heapsort
+	// Heapsort implmentation for lists of PVectors
 	public static void heapsort(List<PVector> points, int count) {
 		// default comparator: x then y
 		Comparator<PVector> comparator = new Comparator<PVector>() {
@@ -165,13 +166,15 @@ public class Phull {
 	}
 
 	// ## swap(List<PVector> points, int a, int b)
-	// I shouldn't have to explain this.
+	// I shouldn't have to explain this :)
 	public static void swap(List<PVector> points, int a, int b) {
 		PVector temp = points.get(a);
 		points.set(a, points.get(b));
 		points.set(b, temp);
 	}
-
+	
+	// ## siftDown(List<PVector> points, int start, int end, Comparator<PVector> comparator)
+	// Sifts the smallest elements down to the bottom of the heap.
 	public static void siftDown(List<PVector> points, int start, int end, Comparator<PVector> comparator) {
 		int root = start;
 		while (root * 2 + 1 <= end) {

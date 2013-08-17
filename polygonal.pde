@@ -1,6 +1,11 @@
+import java.util.*;
+
 int screenX = 600;
 int screenY = 400;
-int seed;
+int layerCount = 4;
+int[] seeds = new int[layerCount];
+color[] colors = new color[10];
+
 float time = 0;
 boolean redraw = false;
 
@@ -8,48 +13,53 @@ void setup() {
 	size(screenX, screenY, P2D);
 	redraw = true;
 
-	//seed = 100;
-	seed = round(random(0, 1000000));
+	// set colors
+	colors[0] = color(85, 98, 112, 200);
+	colors[1] = color(78, 205, 196, 200);
+	colors[2] = color(199, 244, 100, 200);
+	colors[3] = color(255, 107, 107, 200);
+
+	// generate seeds
+	for (int i = 0; i < layerCount; i++) {
+		seeds[i] = round(random(0, 1000000));
+	}
 }
 
 void draw() {
 	smooth();
+	//drawBoxy();
 	drawCurved();
 }
 
 void drawCurved() {
 	if (redraw) {
 		background(255);
-		PImage img = generateNoise(time, seed);
-		//image(img, 0, 0);
-		color fillColor = color(199, 244, 100);
+		for (int i = 0; i < seeds.length; i++) {
+			int seed = seeds[i];
+			PImage img = generateNoise(time, seed);
+			color fillColor = colors[i];
 
-		ArrayList<ArrayList<PVector>> groups = groupPoints(img, 20);
-		for (ArrayList<PVector> pts : groups) {
-			//image(drawEdgePoints(img, pts, color(255, 0, 0)), 0, 0);
-			//image(drawEdgePoints(img, groups.get(0), color(0, 0, 255)), 0, 0);
+			ArrayList<ArrayList<PVector>> groups = groupPoints(img, 20);
+			for (ArrayList<PVector> pts : groups) {
 
-			// we need to sort the points first
-			println("points: " + pts.size());
-			Phull.heapsort(pts, pts.size());
-			println("points post: " + pts.size());
-			pts = Phull.MonotoneChain(pts);
-			println("edge points: " + pts.size());
-			//pts = Phull.ProximityChain(pts, 10);
+				// we need to sort the points first
+				Phull.heapsort(pts, pts.size());
+				pts = Phull.MonotoneChain(pts);
 
-			// draw the hull
-			PShape hull = createShape();
-			hull.beginShape();
-			hull.stroke(0);
-			hull.strokeWeight(2);
-			hull.fill(fillColor);
+				// draw the hull
+				PShape hull = createShape();
+				hull.beginShape();
+				hull.stroke(0);
+				hull.strokeWeight(2);
+				hull.fill(fillColor);
 
-			for (PVector p : pts) {
-				hull.vertex(p.x, p.y);
+				for (PVector p : pts) {
+					hull.vertex(p.x, p.y);
+				}
+
+				hull.endShape(CLOSE);
+				shape(hull);
 			}
-
-			hull.endShape(CLOSE);
-			shape(hull);
 		}
 
 		redraw = false;
@@ -61,30 +71,34 @@ void drawCurved() {
 void drawBoxy() {
 	if (redraw) {
 		background(255);
-		PImage img = generateNoise(time, seed);
-		color fillColor = color(199, 244, 100);
+		for (int i = 0; i < seeds.length; i++) {
+			int seed = seeds[i];
+			PImage img = generateNoise(time, seed);
+			color fillColor = colors[i];
 
-		ArrayList<ArrayList<PVector>> groups = groupPoints(img, 20);
-		for (ArrayList<PVector> pts : groups) {
+			ArrayList<ArrayList<PVector>> groups = groupPoints(img, 20);
+			for (ArrayList<PVector> pts : groups) {
 
-			// we need to sort the points first
-			Phull.heapsort(pts, pts.size());
-			pts = Phull.MonotoneChain(pts);
-			pts = Boxify(pts);
+				// we need to sort the points first
+				Phull.heapsort(pts, pts.size());
+				pts = Phull.MonotoneChain(pts);
+				pts = boxify(pts);
+				//pts = downsamplePoints(pts, 3);
 
-			// draw the hull
-			PShape hull = createShape();
-			hull.beginShape();
-			hull.stroke(0);
-			hull.strokeWeight(2);
-			hull.fill(fillColor);
+				// draw the hull
+				PShape hull = createShape();
+				hull.beginShape();
+				hull.stroke(0);
+				hull.strokeWeight(2);
+				hull.fill(fillColor);
 
-			for (PVector p : pts) {
-				hull.vertex(p.x, p.y);
+				for (PVector p : pts) {
+					hull.vertex(p.x, p.y);
+				}
+
+				hull.endShape(CLOSE);
+				shape(hull);
 			}
-
-			hull.endShape(CLOSE);
-			shape(hull);
 		}
 
 		redraw = false;
@@ -94,10 +108,11 @@ void drawBoxy() {
 }
 
 // turns a list of polygon vertices into a box
-private ArrayList<PVector> Boxify(List<PVector> points) {
+private ArrayList<PVector> boxify(List<PVector> points) {
 	// find the bounding box
-	float minX = float.MAX_VALUE;
-	float minY = float.MAX_VALUE;
+	// lines of the box will form our tangent lines
+	float minX = Float.MAX_VALUE;
+	float minY = Float.MAX_VALUE;
 	float maxX = 0;
 	float maxY = 0;
 
@@ -128,12 +143,13 @@ private ArrayList<PVector> Boxify(List<PVector> points) {
 		}
 	}
 
-	return new ArrayList<PVector>() {
-		pMaxX,
-		pMaxY,
-		pMinX,
-		pMinY
-	};
+	ArrayList<PVector> verts =  new ArrayList<PVector>();
+	verts.add(pMaxX);
+	verts.add(pMaxY);
+	verts.add(pMinX);
+	verts.add(pMinY);
+
+	return verts;
 }
 
 void mouseClicked() {
@@ -189,78 +205,6 @@ private PImage generateNoise(float t, int seed) {
 	return img;
 }
 
-// ## crappyEdgeDetection(PImage img)
-// Returns a list of edge points,
-// using a scanline method and only brightness as a determining factor
-// (I told you it was crappy)
-// TODO:
-//	* determine if left or right edge
-//	* group into shapes
-private ArrayList<PVector> crappyEdgeDetection(PImage img) {
-	float lastBrightness = brightness(img.pixels[0]);
-	float curBrightness;
-	ArrayList<PVector> edgePoints = new ArrayList<PVector>();
-	for (int y = 0; y < img.height; y++) {
-		for (int x = 0; x < img.width; x++) {
-			curBrightness = brightness(img.pixels[x + y * img.width]);
-			if (x > 0 && curBrightness != lastBrightness) {
-				// found the edge
-				edgePoints.add(new PVector(x, y));
-			}
-			else if (y > 0) {
-				if (curBrightness != brightness(img.pixels[x + (y - 1) * img.width])) {
-					// found the edge
-					edgePoints.add(new PVector(x, y));
-				}
-			}
-
-			lastBrightness = curBrightness;
-		}
-	}
-
-	return edgePoints;
-}
-
-// ## crappyEdgeDetection(PImage img)
-// Returns a list of edge points,
-// using a scanline method and only brightness as a determining factor
-// (I told you it was crappy)
-// TODO:
-//	* determine if left or right edge
-//	* group into shapes
-/*
-private ArrayList<PVector> crappyEdgeDetectionGroup(PImage img) {
-	float lastBrightness = brightness(img.pixels[0]);
-	float curBrightness;
-	boolean isLeft = false;
-
-	ArrayList<ArrayList<PVector>> groups = new ArrayList<ArrayList<PVector>>();
-	for (int y = 0; y < img.height; y++) {
-		for (int x = 0; x < img.width; x++) {
-			curBrightness = brightness(img.pixels[x + y * img.width]);
-			PVector p = new PVector(x, y);
-
-			if (x > 0 && curBrightness != lastBrightness) {
-				// found the edge
-				edgePoints.add(new PVector(x, y));
-			}
-
-			lastBrightness = curBrightness;
-
-			if (y > 0) {
-				if (curBrightness != brightness(img.pixels[x + (y - 1) * img.width])) {
-					// found the edge
-					edgePoints.add(new PVector(x, y));
-					isLeft = !isLeft;
-				}
-			}
-		}
-	}
-
-	return edgePoints;
-}
-*/
-
 // downsample
 private ArrayList<PVector> downsamplePoints(ArrayList<PVector> pts, int factor) {
 	ArrayList<PVector> downsampled = new ArrayList<PVector>();
@@ -271,18 +215,6 @@ private ArrayList<PVector> downsamplePoints(ArrayList<PVector> pts, int factor) 
 	}
 
 	return downsampled;
-}
-
-// highlight detected edges
-private PImage drawEdgePoints(PImage img, ArrayList<PVector> pts, color c) {
-	img.loadPixels();
-	for (PVector p : pts) {
-		img.pixels[int(p.x) + int(p.y) * img.width] = c;
-	}
-
-	img.updatePixels();
-
-	return img;
 }
 
 // ## groupPoints
@@ -389,30 +321,4 @@ public boolean pixelBoxCheck(PImage img, int centerX, int centerY, int radius, c
 	}
 
 	return found;
-}
-
-private boolean isPartOfCloud(PVector point, ArrayList<PVector> pts, float proximity, PImage img) {
-	// assuming points are close together
-	// collinear => same cloud?
-	img.loadPixels();
-	for (int i = 0; i < pts.size(); i++) {
-		if (PVector.dist(pts.get(i), point) <= proximity) {
-
-			// check if whitespace exists between the two points
-			PVector vDiff = PVector.sub(point, pts.get(i));
-			vDiff.normalize();
-			vDiff.add(point);
-
-			int x = round(vDiff.x);
-			int y = round(vDiff.y);
-			if (brightness(img.pixels[x + y * screenX]) > 0) {
-				// skip this point
-				continue;
-			}
-
-			return true;
-		}
-	}
-
-	return false;
 }
